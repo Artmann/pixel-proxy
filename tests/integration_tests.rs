@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::{Request, StatusCode, header};
 use tower::ServiceExt;
 use pixel_proxy::create_app;
 
@@ -79,4 +79,95 @@ async fn test_non_image_content() {
     
     // Should stream original content without resizing
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_format_conversion_png() {
+    let app = create_app("https://httpbin.org".to_string());
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/image/jpeg?format=png")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        "image/png"
+    );
+}
+
+#[tokio::test]
+async fn test_format_conversion_webp() {
+    let app = create_app("https://httpbin.org".to_string());
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/image/jpeg?format=webp")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        "image/webp"
+    );
+}
+
+#[tokio::test]
+async fn test_format_conversion_avif() {
+    let app = create_app("https://httpbin.org".to_string());
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/image/jpeg?format=avif")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        "image/avif"
+    );
+}
+
+#[tokio::test]
+async fn test_resize_and_format_conversion() {
+    let app = create_app("https://httpbin.org".to_string());
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/image/jpeg?size=300&format=webp")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        "image/webp"
+    );
+}
+
+#[tokio::test]
+async fn test_invalid_format() {
+    let app = create_app("https://httpbin.org".to_string());
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/image/jpeg?format=invalid")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
