@@ -74,10 +74,19 @@ pub async fn proxy_request(
             }
         }
 
+        // Get quality parameter (only if explicitly specified)
+        let quality = params.get("quality")
+            .and_then(|q| q.parse::<u8>().ok())
+            .map(|q| q.clamp(10, 100));
+
         // Determine output format
         let (output_format, output_content_type) = if let Some(format_str) = params.get("format") {
             if let Some((format, content_type)) = parse_format(format_str) {
-                info!("Converting image to format: {}", format_str);
+                if let Some(q) = quality {
+                    info!("Converting image to format: {} (quality: {})", format_str, q);
+                } else {
+                    info!("Converting image to format: {}", format_str);
+                }
                 (format, content_type)
             } else {
                 return Err(StatusCode::BAD_REQUEST);
@@ -89,19 +98,29 @@ pub async fn proxy_request(
             (original_format, content_type.as_str())
         };
 
-        // Encode the processed image
+        // Encode the processed image with quality settings
         let mut buffer = Vec::new();
 
-        // Handle AVIF with speed optimization
-        if matches!(output_format, image::ImageFormat::Avif) {
-            use image::codecs::avif::AvifEncoder;
-            let encoder = AvifEncoder::new_with_speed_quality(&mut buffer, 8, 60); // Fast speed, good quality
-            img.write_with_encoder(encoder)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        } else {
-            let mut cursor = Cursor::new(&mut buffer);
-            img.write_to(&mut cursor, output_format)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        match output_format {
+            image::ImageFormat::Avif => {
+                use image::codecs::avif::AvifEncoder;
+                let quality_val = quality.unwrap_or(60); // Default AVIF quality
+                let encoder = AvifEncoder::new_with_speed_quality(&mut buffer, 8, quality_val);
+                img.write_with_encoder(encoder)
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            }
+            image::ImageFormat::Jpeg => {
+                use image::codecs::jpeg::JpegEncoder;
+                let quality_val = quality.unwrap_or(80); // Default JPEG quality
+                let encoder = JpegEncoder::new_with_quality(&mut buffer, quality_val);
+                img.write_with_encoder(encoder)
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            }
+            _ => {
+                let mut cursor = Cursor::new(&mut buffer);
+                img.write_to(&mut cursor, output_format)
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            }
         }
 
         let duration = start_time.elapsed();
