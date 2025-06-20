@@ -191,3 +191,28 @@ async fn test_invalid_format() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn test_cache_headers() {
+    let app = create_app("https://httpbin.org".to_string());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/image/jpeg")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CACHE_CONTROL).unwrap(),
+        "public, max-age=31536000, immutable"
+    );
+    assert_eq!(
+        response.headers().get(header::EXPIRES).unwrap(),
+        "Thu, 31 Dec 2037 23:55:55 GMT"
+    );
+}

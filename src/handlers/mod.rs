@@ -134,6 +134,8 @@ pub async fn proxy_request(
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, output_content_type)
             .header(header::CONTENT_LENGTH, buffer.len())
+            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+            .header(header::EXPIRES, "Thu, 31 Dec 2037 23:55:55 GMT")
             .body(Body::from(buffer))
             .unwrap());
     }
@@ -148,6 +150,11 @@ pub async fn proxy_request(
     if let Some(content_length) = response.headers().get(header::CONTENT_LENGTH) {
         builder = builder.header(header::CONTENT_LENGTH, content_length);
     }
+
+    // Add cache headers for streamed images
+    builder = builder
+        .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        .header(header::EXPIRES, "Thu, 31 Dec 2037 23:55:55 GMT");
 
     let stream = response.bytes_stream();
     let body = Body::wrap_stream(stream);
