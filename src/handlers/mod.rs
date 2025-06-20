@@ -9,6 +9,7 @@ use tracing::info;
 use image;
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::time::Instant;
 
 fn parse_format(format_str: &str) -> Option<(image::ImageFormat, &'static str)> {
     match format_str.to_lowercase().as_str() {
@@ -25,6 +26,7 @@ pub async fn proxy_request(
     Path(path): Path<String>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Response<Body>, StatusCode> {
+    let start_time = Instant::now();
     info!("Proxying request: /{}", path);
     
     let client = Client::new();
@@ -93,6 +95,9 @@ pub async fn proxy_request(
             img.write_to(&mut cursor, output_format).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
         
+        let duration = start_time.elapsed();
+        info!("Request /{} completed in {}ms (processed)", path, duration.as_millis());
+        
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, output_content_type)
@@ -114,6 +119,9 @@ pub async fn proxy_request(
     
     let stream = response.bytes_stream();
     let body = Body::wrap_stream(stream);
+    
+    let duration = start_time.elapsed();
+    info!("Request /{} completed in {}ms (streamed)", path, duration.as_millis());
     
     Ok(builder.body(body).unwrap())
 }
