@@ -1,7 +1,6 @@
 use pixel_proxy::create_app;
 use std::env;
 use tokio::net::TcpListener;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() {
