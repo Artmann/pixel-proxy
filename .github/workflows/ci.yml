@@ -18,6 +18,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y nasm
+      
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       
@@ -46,6 +49,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y nasm
+      
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       
@@ -71,6 +77,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y nasm
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable

@@ -45,3 +45,7 @@ The service acts as a reverse proxy for images, fetching them from an upstream s
 ## Development Tips
 
 - Use `cargo build` to verify that your changes work
+
+## Project Conventions
+
+- This project uses semver and conventional commits
