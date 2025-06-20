@@ -1,15 +1,15 @@
 use axum::{
-    extract::{Path, Extension, Query},
+    body::Body,
+    extract::{Extension, Path, Query},
     http::{header, StatusCode},
     response::Response,
-    body::Body,
 };
-use reqwest::Client;
-use tracing::info;
 use image;
+use reqwest::Client;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::time::Instant;
+use tracing::info;
 
 fn parse_format(format_str: &str) -> Option<(image::ImageFormat, &'static str)> {
     match format_str.to_lowercase().as_str() {
@@ -28,37 +28,43 @@ pub async fn proxy_request(
 ) -> Result<Response<Body>, StatusCode> {
     let start_time = Instant::now();
     info!("Proxying request: /{}", path);
-    
+
     let client = Client::new();
     let upstream_url = format!("{}/{}", upstream_base_url, path);
-    
+
     let response = client
         .get(&upstream_url)
         .send()
         .await
         .map_err(|_| StatusCode::BAD_GATEWAY)?;
-    
+
     if !response.status().is_success() {
-        return Err(StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY));
+        return Err(
+            StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY)
+        );
     }
-    
+
     let content_type = response
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|h| h.to_str().ok())
         .unwrap_or("")
         .to_string();
-    
+
     // Check if we need to process the image (resize or format conversion)
-    let needs_processing = content_type.starts_with("image/") && 
-        (params.contains_key("size") || params.contains_key("format"));
-    
+    let needs_processing = content_type.starts_with("image/")
+        && (params.contains_key("size") || params.contains_key("format"));
+
     if needs_processing {
-        let bytes = response.bytes().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
-        
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+
         // Load the image
-        let mut img = image::load_from_memory(&bytes).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
-        
+        let mut img =
+            image::load_from_memory(&bytes).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+
         // Apply resize if requested
         if let Some(size_str) = params.get("size") {
             if let Ok(width) = size_str.parse::<u32>() {
@@ -67,7 +73,7 @@ pub async fn proxy_request(
                 img = img.resize(width, u32::MAX, image::imageops::FilterType::Lanczos3);
             }
         }
-        
+
         // Determine output format
         let (output_format, output_content_type) = if let Some(format_str) = params.get("format") {
             if let Some((format, content_type)) = parse_format(format_str) {
@@ -78,26 +84,33 @@ pub async fn proxy_request(
             }
         } else {
             // Use original format if no format conversion requested
-            let original_format = image::guess_format(&bytes).map_err(|_| StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
+            let original_format =
+                image::guess_format(&bytes).map_err(|_| StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
             (original_format, content_type.as_str())
         };
-        
+
         // Encode the processed image
         let mut buffer = Vec::new();
-        
+
         // Handle AVIF with speed optimization
         if matches!(output_format, image::ImageFormat::Avif) {
             use image::codecs::avif::AvifEncoder;
             let encoder = AvifEncoder::new_with_speed_quality(&mut buffer, 8, 60); // Fast speed, good quality
-            img.write_with_encoder(encoder).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            img.write_with_encoder(encoder)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         } else {
             let mut cursor = Cursor::new(&mut buffer);
-            img.write_to(&mut cursor, output_format).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            img.write_to(&mut cursor, output_format)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
-        
+
         let duration = start_time.elapsed();
-        info!("Request /{} completed in {}ms (processed)", path, duration.as_millis());
-        
+        info!(
+            "Request /{} completed in {}ms (processed)",
+            path,
+            duration.as_millis()
+        );
+
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, output_content_type)
@@ -105,23 +118,27 @@ pub async fn proxy_request(
             .body(Body::from(buffer))
             .unwrap());
     }
-    
+
     // Fallback: stream original image without resizing
     let mut builder = Response::builder().status(StatusCode::OK);
-    
+
     if !content_type.is_empty() {
         builder = builder.header(header::CONTENT_TYPE, content_type);
     }
-    
+
     if let Some(content_length) = response.headers().get(header::CONTENT_LENGTH) {
         builder = builder.header(header::CONTENT_LENGTH, content_length);
     }
-    
+
     let stream = response.bytes_stream();
     let body = Body::wrap_stream(stream);
-    
+
     let duration = start_time.elapsed();
-    info!("Request /{} completed in {}ms (streamed)", path, duration.as_millis());
-    
+    info!(
+        "Request /{} completed in {}ms (streamed)",
+        path,
+        duration.as_millis()
+    );
+
     Ok(builder.body(body).unwrap())
 }

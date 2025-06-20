@@ -1,11 +1,7 @@
 pub mod handlers;
 pub mod services;
 
-use axum::{
-    routing::get,
-    Router,
-    Extension,
-};
+use axum::{routing::get, Extension, Router};
 use tower_http::trace::TraceLayer;
 
 pub fn create_app(upstream_base_url: String) -> Router {
