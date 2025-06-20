@@ -5,11 +5,14 @@ use axum::{
     body::Body,
 };
 use reqwest::Client;
+use tracing::info;
 
 pub async fn proxy_request(
     Extension(upstream_base_url): Extension<String>,
     Path(path): Path<String>,
 ) -> Result<Response<Body>, StatusCode> {
+    info!("Proxying request: /{}", path);
+    
     let client = Client::new();
     let upstream_url = format!("{}/{}", upstream_base_url, path);
     

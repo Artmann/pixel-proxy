@@ -41,3 +41,7 @@ The service acts as a reverse proxy for images, fetching them from an upstream s
 - `src/main.rs`: Entry point (currently minimal)
 - `src/handlers/`: HTTP request handlers (empty modules ready for implementation)
 - `src/services/`: Business logic services (empty modules ready for implementation)
+
+## Development Tips
+
+- Use `cargo build` to verify that your changes work
