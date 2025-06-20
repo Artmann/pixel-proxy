@@ -1,6 +1,9 @@
 # Use the official Rust image
 FROM rust:1.82
 
+# Install NASM for AVIF support
+RUN apt-get update && apt-get install -y nasm && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory
 WORKDIR /usr/src/app
 
