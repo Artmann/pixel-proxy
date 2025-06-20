@@ -1,12 +1,4 @@
-mod handlers;
-mod services;
-
-use axum::{
-    routing::get,
-    Router,
-    Extension,
-};
-use tower_http::trace::TraceLayer;
+use pixel_proxy::create_app;
 use std::env;
 use tokio::net::TcpListener;
 use tracing_subscriber;
@@ -29,10 +21,7 @@ async fn main() {
     println!("🚀 Starting Pixel Proxy server");
     println!("Upstream server: {}", upstream_base_url);
     
-    let app = Router::new()
-        .route("/*path", get(handlers::proxy_request))
-        .layer(Extension(upstream_base_url))
-        .layer(TraceLayer::new_for_http());
+    let app = create_app(upstream_base_url);
 
     let addr = format!("0.0.0.0:{}", port);
     println!("Server running on http://127.0.0.1");
