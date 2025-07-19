@@ -23,7 +23,7 @@ async fn main() {
     let app = create_app(upstream_base_url);
 
     let addr = format!("0.0.0.0:{}", port);
-    println!("Server running on http://127.0.0.1");
+    println!("Server running on http://127.0.0.1:{}", port);
 
     let listener = TcpListener::bind(&addr).await.unwrap();
     axum::Server::from_tcp(listener.into_std().unwrap())
